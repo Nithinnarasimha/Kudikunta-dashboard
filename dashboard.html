@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Kudikunta Lake — Dashboard</title>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <style>
+    /* ---------- Page: light, clean, professional ---------- */
+    :root{
+      --page-bg:#f6f8fa;
+      --panel-bg:#ffffff;
+      --muted:#0f172a;
+      --accent:#0ea5a9;
+      --radius:10px;
+      --shadow: 0 8px 24px rgba(15,23,42,0.06);
+      --card-padding:18px;
+    }
+    *{box-sizing:border-box}
+    html,body{
+      height:100%; margin:0;
+      font-family:Inter,system-ui,Arial;
+      background:var(--page-bg); color:var(--muted);
+      -webkit-font-smoothing:antialiased;
+    }
+    body{display:flex; justify-content:center; padding:28px}
+
+    .shell{width:100%; max-width:1200px; padding:18px}
+    .header{text-align:center; margin-bottom:18px}
+    .header h1{margin:0; font-size:1.5rem}
+    .header .sub{margin-top:6px; color:#475569; font-size:0.95rem}
+
+    /* topbar */
+    .topbar{
+      display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center;
+      gap:12px; margin-bottom:18px; padding:var(--card-padding);
+      background:var(--panel-bg); border-radius:var(--radius); box-shadow:var(--shadow);
+    }
+    .brand{display:flex; gap:12px; align-items:center}
+    .brand img{height:48px; border-radius:6px}
+    .right-controls{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+
+    /* export controls */
+    .export-controls{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    .export-controls label{font-size:0.85rem; color:#374151; margin-right:6px}
+    input[type="datetime-local"]{padding:8px 10px; border-radius:6px; border:1px solid #e6edf3; background:white}
+
+    .btn{
+      background:var(--accent); color:#fff; padding:8px 12px; border-radius:8px; border:0; cursor:pointer; font-weight:600;
+    }
+
+    /* panels */
+    .panel{background:var(--panel-bg); border-radius:var(--radius); padding:var(--card-padding); box-shadow:var(--shadow); margin-bottom:20px}
+
+    h2.section-title{margin:0 0 12px 0; font-size:1.05rem}
+
+    /* charts */
+    .charts-grid{display:flex; flex-direction:column; gap:20px}
+    .chart-row{display:flex; gap:20px; flex-wrap:wrap}
+    .chart-card{flex:1 1 calc(50% - 20px); background:var(--panel-bg); border-radius:8px; padding:12px; box-shadow:var(--shadow); min-width:280px}
+    .chart-card h3{margin:0 0 8px; font-size:0.95rem; text-align:center}
+    .chart-canvas{background:#fff; border-radius:6px; padding:8px}
+    canvas{width:100%!important; height:300px!important}
+
+    @media (min-width:1000px){
+      canvas{height:360px!important}
+    }
+    @media (max-width:980px){
+      .chart-card{flex:1 1 100%}
+      canvas{height:260px!important}
+    }
+
+    /* map */
+    #mapFrame{width:100%; height:420px; border:0; border-radius:8px}
+
+    /* footer */
+    .footer{text-align:left; font-size:0.92rem; color:#475569; margin-top:10px}
+  </style>
+</head>
+
+<body>
+  <div class="shell">
+
+    <div class="header">
+      <h1>Kudikunta Lake Air Quality Dashboard</h1>
+      <div class="sub" id="signedInAs">Signed in as: —</div>
+    </div>
+
+    <div class="topbar">
+      <div class="brand">
+        <img src="logo.png" alt="logo" />
+        <div>
+          <div style="font-weight:700">Kudikunta Lake Project</div>
+          <div style="color:#6b7280;font-size:0.9rem">Live PM10 & PM2.5 from ThingSpeak</div>
+        </div>
+      </div>
+
+      <div class="right-controls">
+        <!-- Export date/time selectors -->
+        <div class="export-controls" title="Select a range and click Export CSV">
+          <label for="fromDt">From</label>
+          <input id="fromDt" type="datetime-local" />
+          <label for="toDt" style="margin-left:6px">To</label>
+          <input id="toDt" type="datetime-local" />
+          <button class="btn" id="exportBtn" title="Export CSV for selected range">Export CSV</button>
+        </div>
+
+        <button class="btn" id="refreshBtn">Refresh</button>
+        <button class="btn" id="signoutBtn">Sign Out</button>
+      </div>
+    </div>
+
+    <!-- CHARTS -->
+    <div class="panel">
+      <h2 class="section-title">Real-time Air Quality Data</h2>
+
+      <div class="charts-grid">
+        <div class="chart-row">
+          <div class="chart-card">
+            <h3>PM10 (µg/m³)</h3>
+            <div class="chart-canvas">
+              <canvas id="pm10Chart"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <h3>PM2.5 (µg/m³)</h3>
+            <div class="chart-canvas">
+              <canvas id="pm25Chart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAP BELOW -->
+    <div class="panel">
+      <h2 class="section-title">Kudikunta Lake — Location</h2>
+      <iframe id="mapFrame" src="https://www.google.com/maps?q=17.4667897,78.3461398&z=17&output=embed" loading="lazy"></iframe>
+    </div>
+
+    <div class="footer">
+      <div id="lastUpdated">Last updated: —</div>
+    </div>
+  </div>
+
+  <script>
+    /* ---------- Config ---------- */
+    const THINGSPEAK = { channelId: 3099976, readKey: '5MLB5JS8PUMPDSRL' };
+    const DEFAULT_RESULTS = 30;
+
+    /* ---------- Session display ---------- */
+    try {
+      const s = JSON.parse(sessionStorage.getItem('kudikunta_user'));
+      document.getElementById('signedInAs').textContent = s?.user ? 'Signed in as: ' + s.user : 'Signed in as: —';
+    } catch(e){}
+
+    /* ---------- Chart setup ---------- */
+    const pm10Ctx = document.getElementById('pm10Chart').getContext('2d');
+    const pm25Ctx = document.getElementById('pm25Chart').getContext('2d');
+
+    const chartOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: true, position: 'top' } },
+      scales: {
+        x: { ticks: { maxRotation: 30, minRotation: 30 } },
+        y: { beginAtZero: true }
+      }
+    };
+
+    const pm10Chart = new Chart(pm10Ctx, {
+      type: 'line',
+      data: { labels: [], datasets: [{ label: 'PM10', data: [], borderColor: '#1e40af', backgroundColor: 'rgba(59,130,246,0.08)', tension: 0.35, fill: true }]},
+      options: chartOptions
+    });
+
+    const pm25Chart = new Chart(pm25Ctx, {
+      type: 'line',
+      data: { labels: [], datasets: [{ label: 'PM2.5', data: [], borderColor: '#0f7766', backgroundColor: 'rgba(14,165,169,0.08)', tension: 0.35, fill: true }]},
+      options: chartOptions
+    });
+
+    /* ---------- Fetch ThingSpeak helper ---------- */
+    // Build url. If start/end provided, include them (ThingSpeak accepts 'start' and 'end' as 'YYYY-MM-DD%20HH:MM:SS')
+    function buildThingSpeakUrl({ startISO = null, endISO = null, results = DEFAULT_RESULTS } = {}) {
+      const base = `https://api.thingspeak.com/channels/${THINGSPEAK.channelId}/feeds.json?api_key=${THINGSPEAK.readKey}`;
+      if (startISO && endISO) {
+        // ThingSpeak expects 'YYYY-MM-DD HH:MM:SS' (space). Encode space as %20.
+        const startStr = startISO.replace('T', ' ');
+        const endStr = endISO.replace('T', ' ');
+        return `${base}&start=${encodeURIComponent(startStr)}&end=${encodeURIComponent(endStr)}`;
+      } else {
+        return `${base}&results=${results}`;
+      }
+    }
+
+    async function fetchThingSpeakData({ startISO = null, endISO = null, results = DEFAULT_RESULTS } = {}) {
+      const url = buildThingSpeakUrl({ startISO, endISO, results });
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Network response not ok: ' + res.status);
+        const json = await res.json();
+        const feeds = json.feeds || [];
+        const labels = feeds.map(f => new Date(f.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) );
+        const pm10 = feeds.map(f => (f.field1 === null ? NaN : Number(f.field1)));
+        const pm25 = feeds.map(f => (f.field2 === null ? NaN : Number(f.field2)));
+        return { feeds, labels, pm10, pm25 };
+      } catch (err) {
+        console.error('ThingSpeak fetch error', err);
+        return null;
+      }
+    }
+
+    /* ---------- Update charts ---------- */
+    async function updateCharts() {
+      const data = await fetchThingSpeakData();
+      if (!data) {
+        document.getElementById('lastUpdated').textContent = 'Last updated: (failed)';
+        return;
+      }
+      pm10Chart.data.labels = data.labels;
+      pm10Chart.data.datasets[0].data = data.pm10;
+      pm10Chart.update();
+
+      pm25Chart.data.labels = data.labels;
+      pm25Chart.data.datasets[0].data = data.pm25;
+      pm25Chart.update();
+
+      document.getElementById('lastUpdated').textContent = 'Last updated: ' + new Date().toLocaleString();
+    }
+
+    // initial + polling
+    updateCharts();
+    let poll = setInterval(updateCharts, 20000);
+
+    /* ---------- Export CSV ---------- */
+    // Utility: convert DateTimeLocal value (YYYY-MM-DDTHH:MM) to 'YYYY-MM-DDTHH:MM:SS' (ISO-like for our use)
+    function normalizeDateTimeLocal(val) {
+      if (!val) return null;
+      // Some browsers include seconds, others don't. Ensure seconds present.
+      if (val.length === 16) return val + ':00';
+      return val;
+    }
+
+    function feedsToCSV(feeds) {
+      // header
+      const header = ['created_at','entry_id','field1','field2'];
+      const rows = feeds.map(f => {
+        // escape commas etc by wrapping in quotes if needed (created_at safe)
+        const created = f.created_at || '';
+        const entry = f.entry_id || '';
+        const f1 = (f.field1 === null || f.field1 === undefined) ? '' : f.field1;
+        const f2 = (f.field2 === null || f.field2 === undefined) ? '' : f.field2;
+        return [created, entry, f1, f2].map(cell => {
+          const s = String(cell);
+          return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g,'""')}"` : s;
+        }).join(',');
+      });
+      return [header.join(','), ...rows].join('\n');
+    }
+
+    document.getElementById('exportBtn').addEventListener('click', async () => {
+      const fromVal = normalizeDateTimeLocal(document.getElementById('fromDt').value);
+      const toVal = normalizeDateTimeLocal(document.getElementById('toDt').value);
+
+      // validate
+      if (fromVal && toVal) {
+        const fromDate = new Date(fromVal);
+        const toDate = new Date(toVal);
+        if (isNaN(fromDate) || isNaN(toDate) || fromDate >= toDate) {
+          alert('Please select a valid From and To range (From must be earlier than To).');
+          return;
+        }
+      }
+
+      // build and fetch
+      const params = {};
+      if (fromVal && toVal) params.startISO = fromVal.replace(':', ':'); // keep format
+      // Note: we pass the full string with seconds (YYYY-MM-DDTHH:MM:SS), but buildThingSpeakUrl will replace T with space.
+      params.endISO = toVal || null;
+      try {
+        // show small feedback
+        const originalText = document.getElementById('exportBtn').textContent;
+        document.getElementById('exportBtn').textContent = 'Exporting...';
+        document.getElementById('exportBtn').disabled = true;
+
+        const data = await fetchThingSpeakData({ startISO: fromVal, endISO: toVal, results: DEFAULT_RESULTS });
+        if (!data || !data.feeds || data.feeds.length === 0) {
+          alert('No data found for the requested range.');
+          document.getElementById('exportBtn').textContent = originalText;
+          document.getElementById('exportBtn').disabled = false;
+          return;
+        }
+
+        const csv = feedsToCSV(data.feeds);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const fromLabel = fromVal ? fromVal.replace(/[:]/g,'-') : 'latest';
+        const toLabel = toVal ? toVal.replace(/[:]/g,'-') : (new Date().toISOString().slice(0,19).replace(/[:]/g,'-'));
+        a.href = url;
+        a.download = `kudikunta_pm_data_${fromLabel}_to_${toLabel}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+
+      } catch (err) {
+        console.error(err);
+        alert('Failed to export CSV. Check console for details.');
+      } finally {
+        document.getElementById('exportBtn').textContent = 'Export CSV';
+        document.getElementById('exportBtn').disabled = false;
+      }
+    });
+
+    /* ---------- UI bindings ---------- */
+    document.getElementById('refreshBtn').addEventListener('click', updateCharts);
+    document.getElementById('signoutBtn').addEventListener('click', () => {
+      try { sessionStorage.removeItem('kudikunta_user'); } catch(e){}
+      clearInterval(poll);
+      location.href = 'index.html';
+    });
+
+    window.addEventListener('beforeunload', ()=> clearInterval(poll));
+  </script>
+</body>
+</html>

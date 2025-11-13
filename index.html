@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+  <title>Kudikunta Lake — Sign In</title>
+  <style>
+    :root{
+      --bg:#f4f6f8; --card:#fff;
+      --accent1:#0ea5a9; --accent2:#3b82f6;
+      --txt:#0f172a;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,Arial;background:var(--bg);color:var(--txt);-webkit-font-smoothing:antialiased}
+    #login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+    .login-card{width:100%;max-width:420px;background:var(--card);border-radius:12px;padding:26px;box-shadow:0 10px 30px rgba(16,24,40,0.08)}
+    .login-card img{height:68px;display:block;margin:6px auto 12px}
+    .login-card h1{text-align:center;margin:6px 0 6px;font-size:1.25rem}
+    .login-card p{color:#475569;text-align:center;margin:0 0 14px}
+    label{display:block;margin-top:10px;font-size:0.9rem;color:#374151}
+    input{width:100%;padding:10px 12px;margin-top:6px;border-radius:8px;border:1px solid #e6edf3;font-size:1rem}
+    .row{display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:10px}
+    .btn{background:linear-gradient(90deg,var(--accent1),var(--accent2));color:#fff;border:0;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600}
+    .link{background:transparent;border:0;color:#2563eb;cursor:pointer;text-decoration:underline;padding:6px}
+    .err{color:#ef4444;margin-top:10px;min-height:18px}
+    @media(max-width:520px){ .login-card{padding:18px} }
+  </style>
+</head>
+<body>
+
+  <div id="login-page">
+    <div class="login-card" role="main" aria-live="polite">
+      <img src="logo.png" alt="logo">
+      <h1>Kudikunta Lake Project</h1>
+      <p>Sign in to view live air-quality data and the lake location.</p>
+
+      <label for="username">Username</label>
+      <input id="username" type="text" autocomplete="off" placeholder="Enter username">
+
+      <label for="password">Password</label>
+      <input id="password" type="password" placeholder="Enter password">
+
+      <div class="row">
+        <button class="btn" id="signinBtn">Sign in</button>
+        <button class="link" id="forgotBtn" onclick="location.href='forgot.html'">Forgot Password?</button>
+      </div>
+
+      <div class="err" id="loginErr"></div>
+    </div>
+  </div>
+
+  <script>
+    // Client-side demo credentials
+    const USERS = [
+      { user: "Kalpana Ramesh", pass: "123456789" },
+      { user: "Sachin Chaudhari", pass: "123456789" },
+      { user: "Kunal Raj", pass: "123" },
+      { user: "Vadla Nithin Narasimha", pass: "8791" }
+    ];
+
+    const signinBtn = document.getElementById('signinBtn');
+    const loginErr = document.getElementById('loginErr');
+
+    function tryLogin(){
+      const u = document.getElementById('username').value.trim();
+      const p = document.getElementById('password').value;
+      if(!u || !p){ loginErr.textContent = 'Enter username and password'; return; }
+      const found = USERS.find(x => x.user === u && x.pass === p);
+      if(!found){ loginErr.textContent = 'Invalid credentials — try again'; return; }
+
+      // store session and go to dashboard
+      sessionStorage.setItem('kudikunta_user', JSON.stringify({ user: found.user, ts: Date.now() }));
+      location.href = 'dashboard.html';
+    }
+
+    signinBtn.addEventListener('click', tryLogin);
+    document.getElementById('password').addEventListener('keydown', e => { if(e.key === 'Enter') tryLogin(); });
+
+    // block pinch/ctrl zoom on login (keeps layout stable)
+    window.addEventListener('wheel', e => { if(e.ctrlKey) e.preventDefault(); }, { passive:false });
+    window.addEventListener('keydown', e => { if(e.ctrlKey && (e.key === '+' || e.key === '-' || e.key === '0')) e.preventDefault(); });
+    window.addEventListener('gesturestart', e => e.preventDefault());
+  </script>
+</body>
+</html>
