@@ -139,7 +139,8 @@
     <!-- MAP BELOW -->
     <div class="panel">
       <h2 class="section-title">Kudikunta Lake — Location</h2>
-      <iframe id="mapFrame" src="https://www.google.com/maps?q=17.4667897,78.3461398&z=17&output=embed" loading="lazy"></iframe>
+      <!-- Centered exactly at 17.467898, 78.346662 -->
+      <iframe id="mapFrame" src="https://www.google.com/maps?q=17.467898,78.346662&z=18&output=embed" loading="lazy"></iframe>
     </div>
 
     <div class="footer">
@@ -185,11 +186,9 @@
     });
 
     /* ---------- Fetch ThingSpeak helper ---------- */
-    // Build url. If start/end provided, include them (ThingSpeak accepts 'start' and 'end' as 'YYYY-MM-DD%20HH:MM:SS')
     function buildThingSpeakUrl({ startISO = null, endISO = null, results = DEFAULT_RESULTS } = {}) {
       const base = `https://api.thingspeak.com/channels/${THINGSPEAK.channelId}/feeds.json?api_key=${THINGSPEAK.readKey}`;
       if (startISO && endISO) {
-        // ThingSpeak expects 'YYYY-MM-DD HH:MM:SS' (space). Encode space as %20.
         const startStr = startISO.replace('T', ' ');
         const endStr = endISO.replace('T', ' ');
         return `${base}&start=${encodeURIComponent(startStr)}&end=${encodeURIComponent(endStr)}`;
@@ -238,19 +237,15 @@
     let poll = setInterval(updateCharts, 20000);
 
     /* ---------- Export CSV ---------- */
-    // Utility: convert DateTimeLocal value (YYYY-MM-DDTHH:MM) to 'YYYY-MM-DDTHH:MM:SS' (ISO-like for our use)
     function normalizeDateTimeLocal(val) {
       if (!val) return null;
-      // Some browsers include seconds, others don't. Ensure seconds present.
       if (val.length === 16) return val + ':00';
       return val;
     }
 
     function feedsToCSV(feeds) {
-      // header
       const header = ['created_at','entry_id','field1','field2'];
       const rows = feeds.map(f => {
-        // escape commas etc by wrapping in quotes if needed (created_at safe)
         const created = f.created_at || '';
         const entry = f.entry_id || '';
         const f1 = (f.field1 === null || f.field1 === undefined) ? '' : f.field1;
@@ -267,7 +262,6 @@
       const fromVal = normalizeDateTimeLocal(document.getElementById('fromDt').value);
       const toVal = normalizeDateTimeLocal(document.getElementById('toDt').value);
 
-      // validate
       if (fromVal && toVal) {
         const fromDate = new Date(fromVal);
         const toDate = new Date(toVal);
@@ -277,13 +271,7 @@
         }
       }
 
-      // build and fetch
-      const params = {};
-      if (fromVal && toVal) params.startISO = fromVal.replace(':', ':'); // keep format
-      // Note: we pass the full string with seconds (YYYY-MM-DDTHH:MM:SS), but buildThingSpeakUrl will replace T with space.
-      params.endISO = toVal || null;
       try {
-        // show small feedback
         const originalText = document.getElementById('exportBtn').textContent;
         document.getElementById('exportBtn').textContent = 'Exporting...';
         document.getElementById('exportBtn').disabled = true;
